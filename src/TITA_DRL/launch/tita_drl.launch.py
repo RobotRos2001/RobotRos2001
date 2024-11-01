@@ -18,6 +18,7 @@ def generate_launch_description():
         executable='tita_drl_obs57', # 可执行文件名
         name='tita_pointfoot_node',  # 节点名，需与 YAML 中一致
         output='screen',             # 输出到屏幕
+        parameters=[config_file]     # 加载参数文件
     )
     
     # 返回 LaunchDescription，包含节点

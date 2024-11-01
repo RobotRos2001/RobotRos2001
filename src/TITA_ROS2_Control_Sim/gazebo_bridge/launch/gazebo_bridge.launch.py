@@ -63,8 +63,11 @@ def generate_launch_description():
                         output='screen')
 
     # save urdf
+    # robot_description_content_dir = PathJoinSubstitution(
+    #     [FindPackageShare("tita_description"), "tita" , "xacro", LaunchConfiguration('urdf')]
+    # )
     robot_description_content_dir = PathJoinSubstitution(
-        [FindPackageShare("tita_description"), "tita" , "xacro", LaunchConfiguration('urdf')]
+        [FindPackageShare("tita_pointfoot_description"), "tita" , "xacro", LaunchConfiguration('urdf')]
     )
     xacro_executable = FindExecutable(name="xacro")
 
