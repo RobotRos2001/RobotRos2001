@@ -128,6 +128,14 @@ def generate_launch_description():
         ],
     )
 
+    joint_position_controller_node = Node(
+        package="custom_joint_position_controller",  # 替换为实际的包名
+        executable="joint_position_controller",      # 替换为实际的可执行文件名
+        name="joint_position_controller",
+        output="screen",
+
+    )
+
     # 返回启动描述，包括声明的参数和所有启动的节点
     return LaunchDescription(
         declared_arguments
@@ -137,6 +145,8 @@ def generate_launch_description():
             joint_state_broadcaster_spawner,  # 关节状态广播器
             imu_sensor_broadcaster_spawner,  # IMU 传感器广播器
             effort_controller,  # 施力控制器
+            joint_position_controller_node,
+            # joint_position_controller_node,
             # template_controller,  # 模板控制器
             # position_controller,
         ]

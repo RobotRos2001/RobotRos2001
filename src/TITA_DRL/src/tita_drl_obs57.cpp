@@ -51,7 +51,6 @@ public:
         }
 
         // 加载 ONNX 模型
-        // std::string model_path = "/home/server/WS_ROS_humble/tita_ws/src/TITA_DRL/config/policy/policy_57.onnx";
         RCLCPP_INFO(this->get_logger(), "Loading ONNX model from: %s", model_path.c_str());
         if (!loadONNXModel(model_path))
         {
@@ -128,7 +127,7 @@ private:
     std::vector<float> default_joint_angles_;
     float obs_scales_angvel_, obs_scales_dofpos_, obs_scales_dofvel_;
     float scaled_commands_x_, scaled_commands_y_, scaled_commands_z_;
-    float stiffness_, damping_, action_scale_pos_, user_torque_limit_,decimation_;
+    float stiffness_, damping_, action_scale_pos_, user_torque_limit_, decimation_;
     int actions_size_, observations_size_, commands_size_;
     float clip_observations_, clip_actions_;
     std::string model_path;
@@ -158,11 +157,59 @@ private:
         latest_imu_msg_ = msg;
     }
 
-    // JointState消息回调
+    // JointState 消息回调
     void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
     {
         std::lock_guard<std::mutex> lock(joint_state_mutex_);
-        latest_joint_state_msg_ = msg;
+
+        // 定义所需的关节排序顺序
+        std::vector<std::string> desired_order = {
+            "joint_left_leg_1",
+            "joint_left_leg_2",
+            "joint_left_leg_3",
+            "joint_right_leg_1",
+            "joint_right_leg_2",
+            "joint_right_leg_3"};
+
+        // 创建用于排序后的 position、velocity 和 effort 数据的向量
+        std::vector<double> sorted_position(desired_order.size());
+        std::vector<double> sorted_velocity(desired_order.size());
+        std::vector<double> sorted_effort(desired_order.size());
+
+        // 遍历所需顺序中的每个关节名，找到在传入消息（msg）中的对应索引
+        for (size_t i = 0; i < desired_order.size(); ++i)
+        {
+            auto it = std::find(msg->name.begin(), msg->name.end(), desired_order[i]);
+            if (it != msg->name.end())
+            {
+                size_t index = std::distance(msg->name.begin(), it);
+                sorted_position[i] = msg->position[index];
+                sorted_velocity[i] = msg->velocity[index];
+                sorted_effort[i] = msg->effort[index];
+            }
+        }
+
+        // 创建一个新的 JointState 消息，使用排序后的数据
+        auto sorted_msg = std::make_shared<sensor_msgs::msg::JointState>();
+        sorted_msg->header = msg->header;
+        sorted_msg->name = desired_order;
+        sorted_msg->position = sorted_position;
+        sorted_msg->velocity = sorted_velocity;
+        sorted_msg->effort = sorted_effort;
+
+        // 将排序后的消息赋值给 latest_joint_state_msg_
+        latest_joint_state_msg_ = sorted_msg;
+        // 打印 latest_joint_state_msg_ 的数据
+        // RCLCPP_INFO(rclcpp::get_logger("joint_state_callback"), "Joint States:");
+        // for (size_t i = 0; i < latest_joint_state_msg_->name.size(); ++i)
+        // {
+        //     RCLCPP_INFO(rclcpp::get_logger("joint_state_callback"),
+        //                 "Joint: %s, Position: %.6f, Velocity: %.6f, Effort: %.6f",
+        //                 latest_joint_state_msg_->name[i].c_str(),
+        //                 latest_joint_state_msg_->position[i],
+        //                 latest_joint_state_msg_->velocity[i],
+        //                 latest_joint_state_msg_->effort[i]);
+        // }
     }
 
     // cmd_vel消息回调
@@ -174,83 +221,81 @@ private:
         current_commands_[2] = static_cast<float>(msg->angular.z) * scaled_commands_z_;
     }
 
+    // 加载参数
+    bool loadParameters()
+    {
+        RCLCPP_INFO(this->get_logger(), "Loading parameters directly...");
+        // 参数声明
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_1", -0.27);
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_2", 0.28);
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_3", -0.73);
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_1", 0.27);
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_2", 0.28);
+        this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_3", -0.73);
 
-// 加载参数
-bool loadParameters()
-{
-    RCLCPP_INFO(this->get_logger(), "Loading parameters directly...");
-    //参数声明
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_1",-0.27);
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_2",0.28);
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_left_leg_3",-0.73);
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_1",0.27);
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_2",0.28);
-    this->declare_parameter<float>("TITAPointfootCfg.default_joint_angle.joint_right_leg_3",-0.73);
+        this->declare_parameter<int>("TITAPointfootCfg.observation.history_length_dof_pos", 3);
+        this->declare_parameter<int>("TITAPointfootCfg.observation.history_length_dof_vel", 2);
 
-    this->declare_parameter<int>("TITAPointfootCfg.observation.history_length_dof_pos", 3);
-    this->declare_parameter<int>("TITAPointfootCfg.observation.history_length_dof_vel", 2);
+        this->declare_parameter<float>("TITAPointfootCfg.control.stiffness", 80.0);
+        this->declare_parameter<float>("TITAPointfootCfg.control.damping", 1.5);
+        this->declare_parameter<float>("TITAPointfootCfg.control.action_scale_pos", 0.1);
+        this->declare_parameter<float>("TITAPointfootCfg.control.decimation", 4.0);
+        this->declare_parameter<float>("TITAPointfootCfg.control.user_torque_limit", 80.0);
 
-    this->declare_parameter<float>("TITAPointfootCfg.control.stiffness", 80.0);
-    this->declare_parameter<float>("TITAPointfootCfg.control.damping", 1.5);
-    this->declare_parameter<float>("TITAPointfootCfg.control.action_scale_pos", 0.1);
-    this->declare_parameter<float>("TITAPointfootCfg.control.decimation", 4.0);
-    this->declare_parameter<float>("TITAPointfootCfg.control.user_torque_limit", 80.0);
+        this->declare_parameter<float>("TITAPointfootCfg.normalization.clip_scales.clip_observations", 100.0);
+        this->declare_parameter<float>("TITAPointfootCfg.normalization.clip_scales.clip_actions", 100.0);
+        this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.ang_vel", 0.25);
+        this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.dof_pos", 1.0);
+        this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.dof_vel", 0.05);
 
-    this->declare_parameter<float>("TITAPointfootCfg.normalization.clip_scales.clip_observations", 100.0);
-    this->declare_parameter<float>("TITAPointfootCfg.normalization.clip_scales.clip_actions", 100.0);
-    this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.ang_vel", 0.25);
-    this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.dof_pos", 1.0);
-    this->declare_parameter<float>("TITAPointfootCfg.normalization.obs_scales.dof_vel", 0.05);
+        this->declare_parameter<int>("TITAPointfootCfg.size.actions_size", 6);
+        this->declare_parameter<int>("TITAPointfootCfg.size.observations_size", 57);
+        this->declare_parameter<int>("TITAPointfootCfg.size.commands_size", 3);
 
-    this->declare_parameter<int>("TITAPointfootCfg.size.actions_size", 6);
-    this->declare_parameter<int>("TITAPointfootCfg.size.observations_size", 57);
-    this->declare_parameter<int>("TITAPointfootCfg.size.commands_size", 3);
+        this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.lin_vel_x", 1.5);
+        this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.lin_vel_y", 1.0);
+        this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.ang_vel_yaw", 0.5);
 
-    this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.lin_vel_x", 1.5);
-    this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.lin_vel_y", 1.0);
-    this->declare_parameter<float>("TITAPointfootCfg.user_cmd_scales.ang_vel_yaw", 0.5);
+        this->declare_parameter<std::string>("TITAPointfootCfg.model_path", "/home/server/WS_ROS_humble/tita_ws/src/TITA_DRL/config/policy/policy_57.onnx");
 
-    this->declare_parameter<std::string>("TITAPointfootCfg.model_path", "/home/server/WS_ROS_humble/tita_ws/src/TITA_DRL/config/policy/policy_57.onnx");
+        // 获取参数
+        default_joint_angles_.resize(6);
+        // 默认角度
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_1", default_joint_angles_[0]);
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_2", default_joint_angles_[1]);
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_3", default_joint_angles_[2]);
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_1", default_joint_angles_[3]);
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_2", default_joint_angles_[4]);
+        this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_3", default_joint_angles_[5]);
+        // 历史数据长度
+        this->get_parameter("TITAPointfootCfg.observation.history_length_dof_pos", history_length_dof_pos_);
+        this->get_parameter("TITAPointfootCfg.observation.history_length_dof_vel", history_length_dof_vel_);
+        // control参数
+        this->get_parameter("TITAPointfootCfg.control.stiffness", stiffness_);
+        this->get_parameter("TITAPointfootCfg.control.damping", damping_);
+        this->get_parameter("TITAPointfootCfg.control.action_scale_pos", action_scale_pos_);
+        this->get_parameter("TITAPointfootCfg.control.decimation", decimation_);
+        this->get_parameter("TITAPointfootCfg.control.user_torque_limit", user_torque_limit_);
+        // 剪切和归一化参数
+        this->get_parameter("TITAPointfootCfg.normalization.clip_scales.clip_observations", clip_observations_);
+        this->get_parameter("TITAPointfootCfg.normalization.clip_scales.clip_actions", clip_actions_);
+        this->get_parameter("TITAPointfootCfg.normalization.obs_scales.ang_vel", obs_scales_angvel_);
+        this->get_parameter("TITAPointfootCfg.normalization.obs_scales.dof_pos", obs_scales_dofpos_);
+        this->get_parameter("TITAPointfootCfg.normalization.obs_scales.dof_vel", obs_scales_dofvel_);
+        // 网络结构参数
+        this->get_parameter("TITAPointfootCfg.size.actions_size", actions_size_);
+        this->get_parameter("TITAPointfootCfg.size.observations_size", observations_size_);
+        this->get_parameter("TITAPointfootCfg.size.commands_size", commands_size_);
+        // 命令缩放参数
+        this->get_parameter("TITAPointfootCfg.user_cmd_scales.lin_vel_x", scaled_commands_x_);
+        this->get_parameter("TITAPointfootCfg.user_cmd_scales.lin_vel_y", scaled_commands_y_);
+        this->get_parameter("TITAPointfootCfg.user_cmd_scales.ang_vel_yaw", scaled_commands_z_);
+        // onnx文件路径
+        this->get_parameter("TITAPointfootCfg.model_path", model_path);
 
-    // 获取参数
-    default_joint_angles_.resize(6);
-    // 默认角度
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_1",default_joint_angles_[0]);
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_2",default_joint_angles_[1]);
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_left_leg_3",default_joint_angles_[2]);
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_1",default_joint_angles_[3]);
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_2",default_joint_angles_[4]);
-    this->get_parameter("TITAPointfootCfg.default_joint_angle.joint_right_leg_3",default_joint_angles_[5]);
-    // 历史数据长度
-    this->get_parameter("TITAPointfootCfg.observation.history_length_dof_pos", history_length_dof_pos_);
-    this->get_parameter("TITAPointfootCfg.observation.history_length_dof_vel", history_length_dof_vel_);
-    // control参数
-    this->get_parameter("TITAPointfootCfg.control.stiffness", stiffness_);
-    this->get_parameter("TITAPointfootCfg.control.damping", damping_);
-    this->get_parameter("TITAPointfootCfg.control.action_scale_pos", action_scale_pos_);
-    this->get_parameter("TITAPointfootCfg.control.decimation", decimation_);
-    this->get_parameter("TITAPointfootCfg.control.user_torque_limit", user_torque_limit_);
-    // 剪切和归一化参数
-    this->get_parameter("TITAPointfootCfg.normalization.clip_scales.clip_observations", clip_observations_);
-    this->get_parameter("TITAPointfootCfg.normalization.clip_scales.clip_actions", clip_actions_);
-    this->get_parameter("TITAPointfootCfg.normalization.obs_scales.ang_vel", obs_scales_angvel_);
-    this->get_parameter("TITAPointfootCfg.normalization.obs_scales.dof_pos", obs_scales_dofpos_);
-    this->get_parameter("TITAPointfootCfg.normalization.obs_scales.dof_vel", obs_scales_dofvel_);
-    // 网络结构参数
-    this->get_parameter("TITAPointfootCfg.size.actions_size", actions_size_);
-    this->get_parameter("TITAPointfootCfg.size.observations_size", observations_size_);
-    this->get_parameter("TITAPointfootCfg.size.commands_size", commands_size_);
-    // 命令缩放参数
-    this->get_parameter("TITAPointfootCfg.user_cmd_scales.lin_vel_x", scaled_commands_x_);
-    this->get_parameter("TITAPointfootCfg.user_cmd_scales.lin_vel_y", scaled_commands_y_);
-    this->get_parameter("TITAPointfootCfg.user_cmd_scales.ang_vel_yaw", scaled_commands_z_);
-    //onnx文件路径
-    this->get_parameter("TITAPointfootCfg.model_path", model_path);
-
-    RCLCPP_INFO(this->get_logger(), "Parameters loaded successfully.");
-    return true;
-}
-
+        RCLCPP_INFO(this->get_logger(), "Parameters loaded successfully.");
+        return true;
+    }
 
     // 加载 ONNX 模型
     bool loadONNXModel(const std::string &model_path)
