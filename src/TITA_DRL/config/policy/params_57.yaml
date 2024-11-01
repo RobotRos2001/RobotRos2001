@@ -1,0 +1,59 @@
+tita_pointfoot_node:  # 节点名称，应与 Launch 文件中的节点名一致
+  ros__parameters:
+    TITAPointfootCfg:
+      joint_names:
+        - "joint_left_leg_1"
+        - "joint_left_leg_2"
+        - "joint_left_leg_3"
+        - "joint_right_leg_1"
+        - "joint_right_leg_2"
+        - "joint_right_leg_3"
+      
+      init_state:
+        default_joint_angle:
+          joint_left_leg_1: -0.27
+          joint_left_leg_2: 0.28
+          joint_left_leg_3: -0.73
+          joint_right_leg_1: 0.27
+          joint_right_leg_2: 0.28
+          joint_right_leg_3: -0.73
+
+      observation:
+        history_length_dof_pos: 3
+        history_length_dof_vel: 2
+
+      control:
+        stiffness: 80.0
+        damping: 1.5
+        action_scale_pos: 0.1
+        decimation: 4
+        user_torque_limit: 80.0
+
+      normalization:
+        clip_scales:
+          clip_observations: 100.0
+          clip_actions: 100.0
+        obs_scales:
+          ang_vel: 0.25
+          dof_pos: 1.0
+          dof_vel: 0.05
+
+      size:
+        actions_size: 6
+        observations_size: 57
+        commands_size: 3
+
+      stand_mode:
+        stand_duration: 1.0
+
+      imu_orientation_offset:
+        roll: 0.0
+        pitch: 0.0
+        yaw: 0.0
+
+      user_cmd_scales:
+        lin_vel_x: 1.5
+        lin_vel_y: 1.0
+        ang_vel_yaw: 0.5
+
+      model_path: "/home/server/WS_ROS_humble/tita_ws/src/TITA_DRL/config/policy/policy_57.onnx"

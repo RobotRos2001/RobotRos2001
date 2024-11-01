@@ -136,8 +136,8 @@ def generate_launch_description():
             gazebo_controller_manager_launch,  # Gazebo 启动文件
             joint_state_broadcaster_spawner,  # 关节状态广播器
             imu_sensor_broadcaster_spawner,  # IMU 传感器广播器
-            # effort_controller,  # 施力控制器
+            effort_controller,  # 施力控制器
             # template_controller,  # 模板控制器
-            position_controller,
+            # position_controller,
         ]
     )

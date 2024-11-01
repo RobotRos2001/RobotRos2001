@@ -1,0 +1,7 @@
+initial_joint_positions:
+  joint_left_leg_1: -0.27
+  joint_right_leg_1: 0.27
+  joint_left_leg_2: 0.28
+  joint_right_leg_2: 0.28
+  joint_left_leg_3: -0.73
+  joint_right_leg_3: -0.73
