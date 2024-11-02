@@ -36,7 +36,7 @@ public:
 
         // 初始化发布者
         action_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
-            "/tita_pointfoot/actions", 10);
+            "/tita/actions", 10);
 
         // 创建定时器，控制循环以50Hz频率运行
         control_timer_ = this->create_wall_timer(
@@ -148,6 +148,68 @@ private:
     // 标志位，指示是否已接收到初始观测
     bool has_received_observation_ = false;
 
+    // 观测数据的键
+    std::vector<std::string> observation_keys_ = {
+        "ang_vel_x",
+        "ang_vel_y",
+        "ang_vel_z",
+        "gravity_proj_x",
+        "gravity_proj_y",
+        "gravity_proj_z",
+        "joint_left_leg_1_pos",
+        "joint_left_leg_2_pos",
+        "joint_left_leg_3_pos",
+        "joint_right_leg_1_pos",
+        "joint_right_leg_2_pos",
+        "joint_right_leg_3_pos",
+        "joint_left_leg_1_vel",
+        "joint_left_leg_2_vel",
+        "joint_left_leg_3_vel",
+        "joint_right_leg_1_vel",
+        "joint_right_leg_2_vel",
+        "joint_right_leg_3_vel",
+        "last_action_1",
+        "last_action_2",
+        "last_action_3",
+        "last_action_4",
+        "last_action_5",
+        "last_action_6",
+        "current_command_1",
+        "current_command_2",
+        "current_command_3",
+        // 历史关节位置（索引 27-44）
+        "history_joint_1_pos_1", "history_joint_1_pos_2", "history_joint_1_pos_3",
+        "history_joint_2_pos_1", "history_joint_2_pos_2", "history_joint_2_pos_3",
+        "history_joint_3_pos_1", "history_joint_3_pos_2", "history_joint_3_pos_3",
+        "history_joint_4_pos_1", "history_joint_4_pos_2", "history_joint_4_pos_3",
+        "history_joint_5_pos_1", "history_joint_5_pos_2", "history_joint_5_pos_3",
+        "history_joint_6_pos_1", "history_joint_6_pos_2", "history_joint_6_pos_3",
+        // 历史关节速度（索引 45-56）
+        "history_joint_1_vel_1", "history_joint_1_vel_2",
+        "history_joint_2_vel_1", "history_joint_2_vel_2",
+        "history_joint_3_vel_1", "history_joint_3_vel_2",
+        "history_joint_4_vel_1", "history_joint_4_vel_2",
+        "history_joint_5_vel_1", "history_joint_5_vel_2",
+        "history_joint_6_vel_1", "history_joint_6_vel_2"};
+    // 打印obs
+    void printObservations(const std::vector<float> &observations)
+    {
+        if (observations.size() != observation_keys_.size())
+        {
+            RCLCPP_WARN(this->get_logger(), "Observations size (%lu) does not match keys size (%lu).", observations.size(), observation_keys_.size());
+            return;
+        }
+
+        std::stringstream ss;
+        ss << "{\n";
+        for (size_t i = 0; i < observations.size(); ++i)
+        {
+            ss << "  " << observation_keys_[i] << ": " << observations[i] << "\n";
+        }
+        ss << "}";
+
+        RCLCPP_INFO(this->get_logger(), "Observations:\n%s", ss.str().c_str());
+    }
     // 成员函数
 
     // IMU消息回调
@@ -472,7 +534,7 @@ private:
         std::transform(current_obs_.begin(), current_obs_.end(), current_obs_.begin(),
                        [this](float x) -> float
                        { return std::clamp(x, -clip_observations_, clip_observations_); });
-
+        // printObservations(current_obs_);
         // 运行推理
         std::vector<float> actions = runInference(current_obs_);
 
@@ -552,7 +614,7 @@ private:
             float actionMin = joint_position - default_joint_angles_[i] + (damping_ * joint_velocity - user_torque_limit_) / stiffness_;
             float actionMax = joint_position - default_joint_angles_[i] + (damping_ * joint_velocity + user_torque_limit_) / stiffness_;
 
-            float scaled_action = std::clamp(actions[i] / action_scale_pos_, actionMin, actionMax);
+            float scaled_action = std::max(actionMin / action_scale_pos_, std::min(actionMax / action_scale_pos_, actions[i]));
             desired_positions[i] = scaled_action * action_scale_pos_ + default_joint_angles_[i];
         }
 

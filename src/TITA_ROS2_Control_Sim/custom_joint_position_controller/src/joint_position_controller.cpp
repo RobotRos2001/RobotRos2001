@@ -16,7 +16,7 @@ public:
     JointPositionController()
         : Node("joint_position_controller")
     {
-                // 声明并获取 PID 参数
+        // 声明并获取 PID 参数
         this->declare_parameter("kp", 80.0);
         this->declare_parameter("ki", 0.0);
         this->declare_parameter("kd", 1.5);
@@ -27,7 +27,7 @@ public:
         // 初始化发布器和订阅器
         effort_publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("/tita/effort_controller/commands", 10);
         target_position_subscriber_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
-            "/tita_pointfoot/actions", 10, std::bind(&JointPositionController::targetPositionCallback, this, std::placeholders::_1));
+            "/tita/actions", 10, std::bind(&JointPositionController::targetPositionCallback, this, std::placeholders::_1));
         joint_state_subscriber_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "/tita/joint_states", 10, std::bind(&JointPositionController::jointStateCallback, this, std::placeholders::_1));
 
@@ -98,13 +98,14 @@ private:
         for (size_t i = 0; i < target_positions_.size(); ++i)
         {
             double position_error = target_positions_[i] - current_positions_[i];
-            integral_error_[i] = 0;       // 计算积分误差（假设循环频率为 10 ms）
+            integral_error_[i] = 0; // 计算积分误差（假设循环频率为 10 ms）
             // integral_error_[i] += position_error * 0.01;       // 计算积分误差（假设循环频率为 10 ms）
             double derivative_error = -current_velocities_[i]; // 导数误差基于关节速度
 
             double effort = kp_ * position_error + ki_ * integral_error_[i] + kd_ * derivative_error;
             effort_msg.data[i] = effort;
         }
+
 
         // 发布力矩到控制器
         effort_publisher_->publish(effort_msg);

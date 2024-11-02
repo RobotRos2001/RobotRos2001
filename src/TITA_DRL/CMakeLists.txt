@@ -13,6 +13,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(Eigen3 REQUIRED)
+
 # 手动指定 onnxruntime 的包含目录
 include_directories(/usr/include/onnxruntime)
 include_directories(${EIGEN3_INCLUDE_DIR})
@@ -32,6 +33,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(tita_drl_obs57 src/tita_drl_obs57.cpp)
+add_executable(text src/text.cpp)
 # 链接库
 target_link_libraries(tita_drl_obs57
     onnxruntime
@@ -41,6 +43,7 @@ ament_target_dependencies(tita_drl_obs57 rclcpp std_msgs sensor_msgs message_fil
 
 install(TARGETS
   tita_drl_obs57
+  text
   DESTINATION lib/${PROJECT_NAME})
 
   # 安装 launch 和 config 目录

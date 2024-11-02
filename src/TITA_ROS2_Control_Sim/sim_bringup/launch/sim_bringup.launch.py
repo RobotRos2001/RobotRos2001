@@ -128,10 +128,21 @@ def generate_launch_description():
         ],
     )
 
+    pid_controller = Node(
+        package="controller_manager",  # 控制器管理包
+        # output='screen',  # 取消注释以在屏幕上输出日志
+        executable="spawner",  # 可执行文件
+        arguments=[
+            "pid_controller",  # 要启动的控制器名称
+            "--controller-manager",  # 指定控制器管理器
+            prefix + "/controller_manager",  # 控制器管理器的命名空间
+        ],
+    )
+
     joint_position_controller_node = Node(
         package="custom_joint_position_controller",  # 替换为实际的包名
-        executable="joint_position_controller",      # 替换为实际的可执行文件名
-        name="joint_position_controller",
+        executable="joint_pub_position",      # 替换为实际的可执行文件名
+        name="joint_pub_position",
         output="screen",
 
     )
@@ -144,8 +155,9 @@ def generate_launch_description():
             gazebo_controller_manager_launch,  # Gazebo 启动文件
             joint_state_broadcaster_spawner,  # 关节状态广播器
             imu_sensor_broadcaster_spawner,  # IMU 传感器广播器
-            effort_controller,  # 施力控制器
+            # effort_controller,  # 施力控制器
             joint_position_controller_node,
+            pid_controller,
             # joint_position_controller_node,
             # template_controller,  # 模板控制器
             # position_controller,
