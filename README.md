@@ -34,7 +34,7 @@ sudo apt install ros-humble-gazebo-ros
 
 ```bash
 mkdir tita_ws/src && cd tita_ws/src
-git clone https://github.com/DDTRobot/TITA_Description.git
+git clone https://github.com/RobotRos2001/TITA_GAZEBO_DRL.git
 colcon build
 source install/setup.bash
 ros2 launch TITA_DRL tita_drl.launch.py
